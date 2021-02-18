@@ -1,0 +1,368 @@
+<html>
+<head>
+    <script type="text/javascript" src="https://sdk.amazonaws.com/js/aws-sdk-2.7.16.min.js" ></script>
+    <!--script type="text/javascript" src="amazon-cognito-identity.js"></script-->
+    <script type="text/javascript" src="https://asurjitmb3demo.s3.amazonaws.com/web/amazon-cognito-identity.js"></script>
+
+    import {CognitoUserPool} from 'amazon-cognito-identity-js';
+
+    <meta charset="utf-8"/>
+    <script type="text/javascript">
+
+
+const region = 'eu-west-1';
+const docClient = createDynamoDbClient();
+
+function createDynamoDbClient() {
+
+    AWS.config.update({
+    region: "eu-west-1",
+    // The endpoint should point to the local or remote computer where DynamoDB (downloadable) is running.
+    endpoint: 'https://dynamodb.us-east-1.amazonaws.com',
+    /*
+        accessKeyId and secretAccessKey defaults can be used while using the downloadable version of DynamoDB. 
+        For security reasons, do not store AWS Credentials in your files. Use Amazon Cognito instead.
+        User name: arn:aws:iam::790349690813:user/asurjit79
+        accessKeyId: "AKIA3QBEDG66RFHEXXJU",
+        secretAccessKey: "W+y2igKsfu+PP/C7oUCzHVj79gElaCCYtBwRApIw"
+    \*/
+    //accessKeyId: "AKIA3QBEDG66RFHEXXJU",
+    //secretAccessKey: "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"
+
+    });
+
+    userAuth();
+  // Use the following config instead when using DynamoDB Local
+  // AWS.config.update({region: 'localhost', endpoint: 'http://localhost:8000', accessKeyId: 'access_key_id', secretAccessKey: 'secret_access_key'});
+  return new AWS.DynamoDB();
+}
+
+
+function userAuth() {
+
+    var CognitoUserPool = AmazonCognitoIdentity.CognitoUserPool;
+
+    var data = {
+        UserPoolId: 'eu-west-1_p5xdevFeO',
+        ClientId: '25lbdnmkmussbkv3bb1oljpoi7'
+    };
+
+    //var cISProvider = new AWS.CognitoIdentityServiceProvider();
+    //var userPool = cISProvider.CognitoUserPool(data);
+
+    var userPool = new CognitoUserPool(data);
+    var cognitoUser = userPool.getCurrentUser();
+
+    alert("My user pool is" + userPool);
+
+    try {
+        console.log("In try block1");
+
+        if (cognitoUser != null) 
+        {
+            console.log("In try block 2");
+
+            cognitoUser.getSession(function(err, session) 
+            {
+                if (err) {
+                    console.log("In try block 3");
+                    console.log(err);
+                    return;
+                }
+
+                console.log('session validity: ' + session.isValid());
+                console.log('session token: ' + session.getIdToken().getJwtToken());
+
+                AWS.config.region = 'eu-west-1';
+                AWS.config.credentials = new AWS.CognitoIdentityCredentials(
+                {
+                    IdentityPoolId : 'eu-west-1:488a6e3b-d785-4853-953c-fff30b773b71', 
+                    Logins : {
+                        "cognito-idp.eu-west-1.amazonaws.com/eu-west-1_p5xdevFeO": session.getIdToken().getJwtToken()
+                    }
+                });   
+       
+                AWS.config.credentials.get(function(err) {
+                if (!err) 
+                {
+                    console.log("In try block 4");
+                    var id = AWS.config.credentials.identityId;
+                    console.log('Cognito Identity ID '+ id);
+                    // Instantiate aws sdk service objects now that the credentials have been updated
+                    var docClient = new AWS.DynamoDB.DocumentClient(
+                    { 
+                        region: AWS.config.region 
+                    }
+                );
+          
+                var params = 
+                {
+                    TableName: 'MB3VideoInfo',
+                    Item:{
+                        keyName:kN, 
+                        technicalMetadata:tM
+                    }
+                };
+
+                docClient.put(
+                    params,
+                    function(err, data) {
+                        if (err){ 
+                            console.log("In try block 5");
+                            console.error(err);
+                        }else
+                        { 
+                            console.log("In try block 6");
+                            console.log(data);
+                        }
+                    }
+                );
+                }
+            });
+        });
+    } 
+    else {
+        console.log("In try block 7");
+        console.log(cognitoUser);
+        return;
+    }
+} catch (e) {
+  console.log("In try block 8");  
+  console.log(e);
+  return;
+}
+
+}
+
+
+
+
+function queryData(vote) {
+
+    // Create the input for query call
+    //const queryInput = createQueryInput();
+
+    var params = {
+        TableName : "MB3VideoInfo",
+        "ConsistentRead": false,
+        ProjectionExpression:"keyName,technicalMetadata"
+        //KeyConditionExpression: "#3fd00 = :3fd00",
+    }
+    
+    //var data;
+    docClient.scan(params, function(err, data) {
+
+        if (err) {
+            console.log("Unable to query. Error:", JSON.stringify(err, null, 2));
+        } else {
+            console.log("Query succeeded.");
+            document.getElementById('textarea').innerHTML += "Querying for list of videos:" + "\n";     
+            
+             
+            for (i = 0; i < data.Count; i++) {
+
+              
+                var str = "https://asurjitoutput.s3.amazonaws.com"
+                var res = data.Items[0].keyName.S.replace("s3://asurjitoutput", str);
+                var rname = res;
+                var rid = 'id' + i;
+
+                var myList = document.getElementById('myList');
+                
+                var aTag = document.createElement('video');
+                var linebreak = document.createElement("p");
+                
+
+                aTag.setAttribute('controls', "control");
+                aTag.setAttribute('width', "320");
+                aTag.setAttribute('height', "240");
+        
+                aTag.setAttribute('src',res);
+
+                var aRad = document.createElement('input');
+                aRad.setAttribute('type', 'radio');
+                aRad.setAttribute('name', rname);
+
+                aTag.innerText = "link text";
+                myList.appendChild(aTag);
+                myList.appendChild(aRad);
+                myList.appendChild(linebreak);
+                myList.appendChild(linebreak);
+ 
+            }
+        }
+    });
+}
+
+
+function getVoteDetails(vote) {
+    
+
+    var docClient1 = new AWS.DynamoDB.DocumentClient();
+
+    var kN = "https://asurjitoutput.s3.amazonaws.com/assets/HLS/Aerial-2_36020200408T140327_00001.ts"
+    var params
+
+        if (vote  == 'Yes') {
+
+            params = {
+            TableName:"MB3VideoInfo",
+            Key:{
+                "keyName": kN,
+            },
+            UpdateExpression: "set Vote.VYes = Vote.VYes + :val",
+            ExpressionAttributeValues:{
+                ":val": 1
+            },
+            ReturnValues:"UPDATED_NEW"
+        }
+        } else {
+
+            params = {
+            TableName:"MB3VideoInfo",
+            Key:{
+                "keyName": kN,
+            },
+            UpdateExpression: "set Vote.VNo = Vote.VNo + :val",
+            ExpressionAttributeValues:{
+                ":val": 1
+            },
+
+            ReturnValues:"UPDATED_NEW"
+        }
+        }   
+
+        docClient1.update(params, function(err, data){
+            if (err) {
+                alert("Error Message still:" + err);
+            }else {
+                console.log('EndpointArn Saved successful');
+                console.log('Data :' + JSON.stringify(data.keyName.Item[0].vote));
+            }
+        });
+
+}
+
+function getVoteResults(){
+
+    var docClient2 = new AWS.DynamoDB.DocumentClient();
+    //var docClient1 = new AWS.DynamoDB.DocumentClient();
+
+    var kN = "https://asurjitoutput.s3.amazonaws.com/assets/HLS/Aerial-2_36020200408T140327_00001.ts"
+
+    var params = {
+        TableName:"MB3VideoInfo",
+        Key:{
+            "keyName": {
+                S: kN,
+            }  
+        } 
+    };
+ 
+    docClient.getItem(params, function(err, data) {
+        
+        if (err) {
+            alert("Error message in getVoteResult::" + err, err.stack);
+        } else { // an error occurred
+            console.log('EndpointArn Saved successful');
+            console.log('Data :' + JSON.stringify(data));
+            var yVotes = data.Item.Vote.M.VYes.N;;
+            var nVotes = data.Item.Vote.M.VNo.N;;
+            //console.log('Data :' + JSON.stringify(data.keyName.Item[0].Vote.VNo));
+            console.log ("Yes Votes are:" + yVotes);
+            console.log ("No Votes are:" + nVotes);
+            
+        }        
+    });
+}
+
+</script>
+</head>
+
+<body>
+<table>
+    
+    <td>
+        <table>
+            <H1>1.Latest Videos from Champions leage</H1>
+            <td><input id="queryData" type="button" value="List Videos" onclick="queryData();" /></td>
+            
+            <table>
+            <H1>Vote on the results!</H1>
+            <tr>
+            <form>
+              <td width="50">
+                <input type="radio" name="vote" onclick="getVoteDetails(this.value)" value="Yes">Yes<br>
+              </td>
+              <td width="50">
+                <input type="radio" name="vote" onclick="getVoteDetails(this.value)" value="No">No<br>
+              </td>
+            </form>              
+           </tr>
+           <tr>
+                <td width="150"> 
+                    <button type="button" name="Results" onclick=getVoteResults()>
+                        Get Results!
+                    </button>
+                    <br> 
+                </td>
+           </tr>
+        </table>
+
+        </table>
+    </td>
+    
+</table>
+
+<br>
+<text readonly id= "textarea" style="width:400px; height:100px">
+</text>
+
+<div id="myList">
+    <a href="/abc/jpg">Myfile path</a>
+    <br/>
+</div>
+
+
+
+<script type="text/javascript">
+    function handleQueryError(err) {
+  if (!err) {
+    console.error('Encountered error object was empty');
+    return;
+  }
+  if (!err.code) {
+    console.error(`An exception occurred, investigate and configure retry strategy. Error: ${JSON.stringify(err)}`);
+    return;
+  }
+  // here are no API specific errors to handle for Query, common DynamoDB API errors are handled below
+  handleCommonErrors(err);
+}
+
+function handleCommonErrors(err) {
+  switch (err.code) {
+    case 'InternalServerError':
+      console.error(`Internal Server Error, generally safe to retry with exponential back-off. Error: ${err.message}`);
+      return;
+    case 'ResourceNotFoundException':
+      console.error(`One of the tables was not found, verify table exists before retrying. Error: ${err.message}`);
+      return;
+    case 'ServiceUnavailable':
+      console.error(`Had trouble reaching DynamoDB. generally safe to retry with exponential back-off. Error: ${err.message}`);
+      return;      
+    case 'UnrecognizedClientException':
+      console.error(`The request signature is incorrect most likely due to an invalid AWS access key ID or secret key, fix before retrying.` 
+        + `Error: ${err.message}`);
+      return;
+    case 'ValidationException':
+      console.error(`The input fails to satisfy the constraints specified by DynamoDB, `
+        + `fix input before retrying. Error: ${err.message}`);
+      return;
+    default:
+      console.error(`An exception occurred, investigate and configure retry strategy. Error: ${err.message}`);
+      return;
+  }
+}
+
+</script>
+</html>
